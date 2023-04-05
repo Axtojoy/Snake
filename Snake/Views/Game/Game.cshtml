@@ -1,0 +1,156 @@
+﻿@model Snake.Models.Game.GameViewModel
+<html>
+<head>
+    <title>Игра</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="canvas" width="300" height="300"></canvas>
+    <button id="reset-button">Сброс</button>
+
+    <script>
+        
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+        let player = 1;
+        const points = [];
+        for (let i = 0; i < 6; i++) {
+            for (let j = 0; j < 6; j++) {
+                const x = 50 + i * 40;
+                const y = 50 + j * 40;
+                points.push({ x, y });
+                ctx.beginPath();
+                ctx.arc(x, y, 4, 0, 2 * Math.PI);
+                ctx.fillStyle = "black";
+                ctx.fill();
+            }
+        }
+        @foreach (var line in Model.Lines)
+        {
+            @:ctx.beginPath();
+            @:ctx.moveTo(@line.Start.X, @line.Start.Y);
+            @:ctx.lineTo(@line.End.X, @line.End.Y);
+            @:ctx.stroke();
+        }
+
+        let prevPoint = null;
+
+        let prevLine = null;
+
+        canvas.addEventListener("mousedown", (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const nearestPoint = points.reduce((prev, curr) => {
+                const prevDist = Math.sqrt(
+                    Math.pow(prev.x - x, 2) + Math.pow(prev.y - y, 2)
+                );
+                const currDist = Math.sqrt(
+                    Math.pow(curr.x - x, 2) + Math.pow(curr.y - y, 2)
+                );
+                return currDist < prevDist ? curr : prev;
+            });
+
+            if (!prevPoint) {
+                prevPoint = nearestPoint;
+                return;
+            }
+            
+            if (
+                nearestPoint.x === prevPoint.x ||
+                nearestPoint.y === prevPoint.y
+            ) {
+                const line = {
+                    Start: {
+                        X: prevPoint.x,
+                        Y: prevPoint.y
+                    },
+                    End: {
+                        X: nearestPoint.x,
+                        Y: nearestPoint.y
+                    }
+                };
+                
+                    
+                let intersection = false;
+                if (prevLine) {
+                    if (
+                        (line.x1 === line.x2 &&
+                            prevLine.x1 === prevLine.x2 &&
+                            line.x1 === prevLine.x1 &&
+                            ((line.y1 > prevLine.y1 && line.y1 < prevLine.y2) ||
+                                (line.y2 > prevLine.y1 && line.y2 < prevLine.y2) ||
+                                (prevLine.y1 > line.y1 && prevLine.y1 < line.y2) ||
+                                (prevLine.y2 > line.y1 && prevLine.y2 < line.y2))) ||
+                        (line.y1 === line.y2 &&
+                            prevLine.y1 === prevLine.y2 &&
+                            line.y1 === prevLine.y1 &&
+                            ((line.x1 > prevLine.x1 && line.x1 < prevLine.x2) ||
+                                (line.x2 > prevLine.x1 && line.x2 < prevLine.x2) ||
+                                (prevLine.x1 > line.x1 && prevLine.x1 < line.x2) ||
+                                (prevLine.x2 > line.x1 && prevLine.x2 < line.x2)))
+                    ) {
+                        intersection = true;
+                    }
+                }
+                if (!intersection) {
+                    drawLine(line);
+                    prevLine = line;
+                    prevPoint = nearestPoint;
+                    $.ajax({
+                        type: "POST",
+                        url: "@Url.Action("GameAdd", "Game")",
+                        data: {prevPointX: prevPoint.x,
+                               prevPointY: prevPoint.y,
+                               nearestPointX: nearestPoint.x,
+                               nearestPointY: nearestPoint.y},
+                        success: function (response) {
+                           
+                        },
+                        error: function (jqXHR, textStatus, errorThrown) {
+                            showError();
+                        }
+                    })
+                } else {
+                    alert("Игрок #" + player + " проиграл");
+                }
+            }
+            $('#reset-button').click(function () {
+                $.ajax({
+                    url: "@Url.Action("Reset", "Game")",
+                    method: "POST",
+                    success: function (response) {
+                        window.location.reload();
+                    },
+                    error: function (jqXHR, textStatus, errorThrown) {
+                        showError();
+                    }
+                });
+            });
+            
+           
+        });
+
+        function drawLine(line) {
+            ctx.beginPath();
+            ctx.moveTo(line.Start.X, line.Start.Y);
+            ctx.lineTo(line.End.X, line.End.Y);
+            if(player == 2){
+                ctx.strokeStyle = "blue";
+                player--
+            }
+            else{
+                ctx.strokeStyle = "green";
+                player++
+            }
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+    </script>
+</body>
+</html>
